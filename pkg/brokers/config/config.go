@@ -1,8 +1,8 @@
 package config
 
 type Kafka struct {
-	Brokers     []string
-	TopicInput  string
-	TopicOutput string
-	GroupID     string
+	Brokers      []string
+	InputTopics  []string
+	OutputTopics []string
+	GroupID      string
 }
