@@ -10,7 +10,7 @@ import (
 func NewReader(cfg *config.Kafka) *kafka.Reader {
 	return kafka.NewReader(kafka.ReaderConfig{
 		Brokers: cfg.Brokers,
-		Topic:   cfg.TopicInput,
+		Topic:   cfg.TopicInput, // TODO: Изменить на Topics string[] + Изменить конфиг под это
 		GroupID: cfg.TopicOutput,
 	})
 }
