@@ -13,41 +13,41 @@ type Consumer struct {
 	handlers map[string]HandlerFunc
 }
 
-func NewRouter(reader *kafka.Reader) *Consumer {
+func NewConsumer(reader *kafka.Reader) *Consumer {
 	return &Consumer{reader: reader, handlers: make(map[string]HandlerFunc)}
 }
 
-func (r *Consumer) RegisterHandler(topic string, handler HandlerFunc) {
-	r.handlers[topic] = handler
+func (c *Consumer) RegisterHandler(topic string, handler HandlerFunc) {
+	c.handlers[topic] = handler
 }
 
-func (r *Consumer) getHandler(topic string) (HandlerFunc, bool) {
-	handler, ok := r.handlers[topic]
+func (c *Consumer) getHandler(topic string) (HandlerFunc, bool) {
+	handler, ok := c.handlers[topic]
 	return handler, ok
 }
 
-func (r *Consumer) Consume(ctx context.Context) {
+func (c *Consumer) Consume(ctx context.Context, workerCount int) {
+	jobs := make(chan kafka.Message)
+
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			for msg := range jobs {
+				if err := c.handlers[msg.Topic](ctx, msg); err != nil {
+					log.Printf("handler error: %v", err)
+				} else {
+					if err := c.reader.CommitMessages(ctx, msg); err != nil {
+						log.Printf("commit error: %v", err)
+					}
+				}
+			}
+		}()
+	}
+
 	for {
-		m, err := r.reader.ReadMessage(ctx)
+		msg, err := c.reader.ReadMessage(ctx)
 		if err != nil {
-			if ctx.Err() != nil {
-				log.Println("[kafka] consumer shutdown")
-				return
-			}
-			log.Printf("[kafka] read error: %v", err)
-			continue
+			return
 		}
-
-		handler, ok := r.getHandler(m.Topic)
-		if !ok {
-			log.Printf("[kafka] no handler for topic %s, skipping offset=%d", m.Topic, m.Offset)
-			continue
-		}
-
-		go func(msg kafka.Message) {
-			if err := handler(ctx, msg); err != nil {
-				log.Printf("[kafka] handler error for topic %s: %v", msg.Topic, err)
-			}
-		}(m)
+		jobs <- msg
 	}
 }
