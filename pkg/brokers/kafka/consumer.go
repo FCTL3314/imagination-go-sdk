@@ -8,25 +8,25 @@ import (
 
 type HandlerFunc func(ctx context.Context, msg kafka.Message) error
 
-type Router struct {
+type Consumer struct {
 	reader   *kafka.Reader
 	handlers map[string]HandlerFunc
 }
 
-func NewRouter(reader *kafka.Reader) *Router {
-	return &Router{reader: reader, handlers: make(map[string]HandlerFunc)}
+func NewRouter(reader *kafka.Reader) *Consumer {
+	return &Consumer{reader: reader, handlers: make(map[string]HandlerFunc)}
 }
 
-func (r *Router) RegisterHandler(topic string, handler HandlerFunc) {
+func (r *Consumer) RegisterHandler(topic string, handler HandlerFunc) {
 	r.handlers[topic] = handler
 }
 
-func (r *Router) getHandler(topic string) (HandlerFunc, bool) {
+func (r *Consumer) getHandler(topic string) (HandlerFunc, bool) {
 	handler, ok := r.handlers[topic]
 	return handler, ok
 }
 
-func (r *Router) Consume(ctx context.Context) {
+func (r *Consumer) Consume(ctx context.Context) {
 	for {
 		m, err := r.reader.ReadMessage(ctx)
 		if err != nil {
