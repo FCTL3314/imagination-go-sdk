@@ -2,18 +2,9 @@ package kafka
 
 import (
 	"context"
-	"github.com/FCTL3314/imagination-go-sdk/pkg/brokers/config"
 	"github.com/segmentio/kafka-go"
 	"log"
 )
-
-func NewReader(cfg *config.Kafka) *kafka.Reader {
-	return kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     cfg.Brokers,
-		GroupTopics: cfg.InputTopics,
-		GroupID:     cfg.GroupID,
-	})
-}
 
 type HandlerFunc func(ctx context.Context, msg kafka.Message) error
 
