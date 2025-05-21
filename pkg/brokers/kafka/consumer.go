@@ -32,7 +32,12 @@ func (c *Consumer) Consume(ctx context.Context, workerCount int) {
 	for i := 0; i < workerCount; i++ {
 		go func() {
 			for msg := range jobs {
-				if err := c.handlers[msg.Topic](ctx, msg); err != nil {
+				handlerFunc, ok := c.getHandler(msg.Topic)
+				if !ok {
+					log.Printf("no handler for topic: %s", msg.Topic)
+					continue
+				}
+				if err := handlerFunc(ctx, msg); err != nil {
 					log.Printf("handler error: %v", err)
 				} else {
 					if err := c.reader.CommitMessages(ctx, msg); err != nil {
