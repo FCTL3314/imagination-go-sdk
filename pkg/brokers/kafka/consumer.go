@@ -11,13 +11,13 @@ import (
 )
 
 type MessageHandler interface {
-	Handle(ctx context.Context, msg kafka.Message) error
+	Handle(ctx context.Context, logger *zap.Logger, msg kafka.Message) error
 }
 
-type HandlerFunc func(ctx context.Context, msg kafka.Message) error
+type HandlerFunc func(ctx context.Context, logger *zap.Logger, msg kafka.Message) error
 
-func (f HandlerFunc) Handle(ctx context.Context, msg kafka.Message) error {
-	return f(ctx, msg)
+func (f HandlerFunc) Handle(ctx context.Context, logger *zap.Logger, msg kafka.Message) error {
+	return f(ctx, logger, msg)
 }
 
 type Consumer struct {
@@ -86,7 +86,7 @@ func (c *Consumer) Start() {
 
 			backoff = time.Second
 
-			if err := c.handler.Handle(c.ctx, m); err != nil {
+			if err := c.handler.Handle(c.ctx, c.logger, m); err != nil {
 				c.logger.Error(
 					"message handling failed", zap.Error(err),
 					zap.String("topic", m.Topic), zap.Int64("offset", m.Offset),

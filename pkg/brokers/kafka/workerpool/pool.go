@@ -32,7 +32,7 @@ func NewPoolHandler(concurrency int, handler kafkasdk.MessageHandler, logger *za
 func (p *PoolHandler) worker() {
 	defer p.wg.Done()
 	for msg := range p.jobs {
-		if err := p.handler.Handle(context.Background(), msg); err != nil {
+		if err := p.handler.Handle(context.Background(), p.logger, msg); err != nil {
 			p.logger.Warn("handle message failed", zap.Error(err))
 		}
 	}
