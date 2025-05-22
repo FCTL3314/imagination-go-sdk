@@ -75,6 +75,7 @@ func (c *Consumer) Start() {
 					return
 				}
 				c.logger.Error("fetch message error", zap.Error(err))
+				c.logger.Info("sleeping before retry", zap.Duration("backoff", backoff))
 				time.Sleep(backoff)
 				backoff = backoff * 2
 				if backoff > 30*time.Second {
@@ -86,8 +87,10 @@ func (c *Consumer) Start() {
 			backoff = time.Second
 
 			if err := c.handler.Handle(c.ctx, m); err != nil {
-				c.logger.Error("message handling failed", zap.Error(err),
-					zap.String("topic", m.Topic), zap.Int64("offset", m.Offset))
+				c.logger.Error(
+					"message handling failed", zap.Error(err),
+					zap.String("topic", m.Topic), zap.Int64("offset", m.Offset),
+				)
 			} else {
 				if err := c.reader.CommitMessages(c.ctx, m); err != nil {
 					c.logger.Warn("commit message failed", zap.Error(err))

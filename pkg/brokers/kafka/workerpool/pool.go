@@ -4,19 +4,23 @@ import (
 	"context"
 	kafkasdk "github.com/FCTL3314/imagination-go-sdk/pkg/brokers/kafka"
 	"github.com/segmentio/kafka-go"
+	"go.uber.org/zap"
 	"sync"
 )
 
 type PoolHandler struct {
 	jobs    chan kafka.Message
 	handler kafkasdk.MessageHandler
-	wg      sync.WaitGroup
+	logger  *zap.Logger
+
+	wg sync.WaitGroup
 }
 
-func NewPoolHandler(concurrency int, handler kafkasdk.MessageHandler) *PoolHandler {
+func NewPoolHandler(concurrency int, handler kafkasdk.MessageHandler, logger *zap.Logger) *PoolHandler {
 	p := &PoolHandler{
 		jobs:    make(chan kafka.Message, concurrency*2),
 		handler: handler,
+		logger:  logger,
 	}
 	p.wg.Add(concurrency)
 	for i := 0; i < concurrency; i++ {
@@ -29,7 +33,7 @@ func (p *PoolHandler) worker() {
 	defer p.wg.Done()
 	for msg := range p.jobs {
 		if err := p.handler.Handle(context.Background(), msg); err != nil {
-			// логика ошибок (DLQ, retry, метрики…)
+			p.logger.Warn("handle message failed", zap.Error(err))
 		}
 	}
 }
