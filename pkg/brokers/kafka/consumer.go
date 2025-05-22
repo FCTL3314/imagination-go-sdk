@@ -10,14 +10,33 @@ import (
 	"go.uber.org/zap"
 )
 
-type MessageHandler interface {
-	Handle(ctx context.Context, logger *zap.Logger, msg kafka.Message) error
+type MessageMetadata struct {
+	CorrelationID string
 }
 
-type HandlerFunc func(ctx context.Context, logger *zap.Logger, msg kafka.Message) error
+type MessageHandler interface {
+	Handle(
+		ctx context.Context,
+		logger *zap.Logger,
+		metadata *MessageMetadata,
+		msg kafka.Message,
+	) error
+}
 
-func (f HandlerFunc) Handle(ctx context.Context, logger *zap.Logger, msg kafka.Message) error {
-	return f(ctx, logger, msg)
+type HandlerFunc func(
+	ctx context.Context,
+	logger *zap.Logger,
+	metadata *MessageMetadata,
+	msg kafka.Message,
+) error
+
+func (f HandlerFunc) Handle(
+	ctx context.Context,
+	logger *zap.Logger,
+	metadata *MessageMetadata,
+	msg kafka.Message,
+) error {
+	return f(ctx, logger, metadata, msg)
 }
 
 type Consumer struct {
@@ -86,14 +105,22 @@ func (c *Consumer) Start() {
 
 			backoff = time.Second
 
+			correlationID := c.getCorrelationID(&m)
 			c.logger.Info("received kafka message",
+				zap.String("correlation_id", correlationID),
 				zap.String("topic", m.Topic),
 				zap.Int("partition", m.Partition),
 				zap.Int64("offset", m.Offset),
 				zap.Time("time", m.Time),
 			)
+			c.logger.Debug("message payload", zap.String("value", string(m.Value)))
 
-			if err := c.handler.Handle(c.ctx, c.logger, m); err != nil {
+			if err := c.handler.Handle(
+				c.ctx,
+				c.logger,
+				&MessageMetadata{CorrelationID: correlationID},
+				m,
+			); err != nil {
 				c.logger.Error(
 					"message handling failed", zap.Error(err),
 					zap.String("topic", m.Topic), zap.Int64("offset", m.Offset),
@@ -118,4 +145,13 @@ func (c *Consumer) Close() error {
 	}
 	c.logger.Info("consumer closed")
 	return nil
+}
+
+func (c *Consumer) getCorrelationID(m *kafka.Message) string {
+	for _, h := range m.Headers {
+		if string(h.Key) == "correlation_id" {
+			return string(h.Value)
+		}
+	}
+	return ""
 }
