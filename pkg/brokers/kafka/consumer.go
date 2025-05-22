@@ -86,6 +86,13 @@ func (c *Consumer) Start() {
 
 			backoff = time.Second
 
+			c.logger.Info("received kafka message",
+				zap.String("topic", m.Topic),
+				zap.Int("partition", m.Partition),
+				zap.Int64("offset", m.Offset),
+				zap.Time("time", m.Time),
+			)
+
 			if err := c.handler.Handle(c.ctx, c.logger, m); err != nil {
 				c.logger.Error(
 					"message handling failed", zap.Error(err),
