@@ -73,7 +73,7 @@ func NewConsumer(cfg ConsumerConfig, handler MessageHandler) *Consumer {
 
 	return &Consumer{
 		reader:  reader,
-		handler: handler,
+		handler: WithCorrelationID(handler),
 		logger:  cfg.Logger,
 		ctx:     ctx,
 		cancel:  cancel,

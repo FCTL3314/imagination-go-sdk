@@ -8,17 +8,23 @@ import (
 	"sync"
 )
 
+type job struct {
+	ctx      context.Context
+	logger   *zap.Logger
+	metadata *kafkasdk.MessageMetadata
+	msg      kafka.Message
+}
+
 type PoolHandler struct {
-	jobs    chan kafka.Message
+	jobs    chan job
 	handler kafkasdk.MessageHandler
 	logger  *zap.Logger
-
-	wg sync.WaitGroup
+	wg      sync.WaitGroup
 }
 
 func NewPoolHandler(concurrency int, handler kafkasdk.MessageHandler, logger *zap.Logger) *PoolHandler {
 	p := &PoolHandler{
-		jobs:    make(chan kafka.Message, concurrency*2),
+		jobs:    make(chan job, concurrency*2),
 		handler: handler,
 		logger:  logger,
 	}
@@ -31,16 +37,21 @@ func NewPoolHandler(concurrency int, handler kafkasdk.MessageHandler, logger *za
 
 func (p *PoolHandler) worker() {
 	defer p.wg.Done()
-	for msg := range p.jobs {
-		if err := p.handler.Handle(context.Background(), p.logger, msg); err != nil {
-			p.logger.Warn("handle message failed", zap.Error(err))
+	for j := range p.jobs {
+		if err := p.handler.Handle(j.ctx, j.logger, j.metadata, j.msg); err != nil {
+			j.logger.Warn("handle message failed", zap.Error(err))
 		}
 	}
 }
 
-func (p *PoolHandler) Handle(ctx context.Context, msg kafka.Message) error {
+func (p *PoolHandler) Handle(
+	ctx context.Context,
+	logger *zap.Logger,
+	metadata *kafkasdk.MessageMetadata,
+	msg kafka.Message,
+) error {
 	select {
-	case p.jobs <- msg:
+	case p.jobs <- job{ctx: ctx, logger: logger, metadata: metadata, msg: msg}:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
